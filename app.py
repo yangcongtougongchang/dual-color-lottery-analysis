@@ -637,6 +637,19 @@ def plot_pie_chart(ratio_df, title):
     fig.update_layout(dragmode=False, showlegend=False)
     return fig
 
+def analyze_consecutive_numbers(df):
+    """连号分析"""
+    consecutive_stats = []
+    for _, row in df.iterrows():
+        reds = sorted([row[f'红球{i}'] for i in range(1, 7)])
+        consecutive_count = sum(1 for i in range(len(reds)-1) if reds[i+1] - reds[i] == 1)
+        consecutive_stats.append(consecutive_count)
+    
+    result_df = pd.DataFrame({'连号对数': consecutive_stats})
+    value_counts = result_df['连号对数'].value_counts().reset_index()
+    value_counts.columns = ['连号对数', '出现次数']
+    return value_counts
+
 def plot_zone_radar(zone_df):
     """区间分布雷达图"""
     fig = go.Figure()
@@ -990,4 +1003,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
