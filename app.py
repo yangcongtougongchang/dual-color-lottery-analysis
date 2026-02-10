@@ -372,6 +372,17 @@ def check_historical_match(df, red_balls, blue_ball):
     
     return {'matched': False}
 
+def analyze_odd_even_ratio(df):
+    """奇偶比例分析"""
+    ratios = []
+    for _, row in df.iterrows():
+        reds = [row[f'红球{i}'] for i in range(1, 7)]
+        odd_count = sum(1 for x in reds if x % 2 == 1)
+        ratios.append(f"{odd_count}:{6-odd_count}")
+    
+    ratio_freq = Counter(ratios)
+    return pd.DataFrame(list(ratio_freq.items()), columns=['奇偶比', '出现次数'])
+
 def generate_smart_numbers(df, strategy_type='balanced', kill_codes=None, drag_codes=None):
     """
     基于历史数据的智能预测算法
@@ -979,3 +990,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
