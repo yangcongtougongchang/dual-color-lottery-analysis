@@ -33,13 +33,15 @@ st.markdown("""
 <style>
     .title-text {
         font-family: 'Helvetica Neue', sans-serif;
-        background: linear-gradient(120deg, #ff6b6b, #ee5a6f);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #ff6b6b;  /* 使用纯红色 */
         font-weight: 800;
         text-align: center;
         padding: 20px 0;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);  /* 添加文字阴影增强可见性 */
+        font-size: 2.5rem;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
     .help-text {
         background: #f8f9fa;
@@ -592,4 +594,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
