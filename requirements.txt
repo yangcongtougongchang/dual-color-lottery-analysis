@@ -4,3 +4,4 @@ numpy==1.26.3
 plotly==5.18.0
 requests==2.31.0
 packaging==23.2
+matplotlib>=3.5.0
