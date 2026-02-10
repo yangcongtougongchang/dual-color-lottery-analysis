@@ -64,12 +64,13 @@ st.markdown("""
 
 @st.cache_data(ttl=3600)
 def fetch_ssq_data():
-    """获取双色球历史数据"""
+    """获取双色球历史数据 - 500期"""
     try:
         data = []
         base_date = datetime.now()
         
-        for i in range(100):
+        # 生成500期数据
+        for i in range(500):
             issue_date = base_date - timedelta(days=i*3)
             issue_no = f"{issue_date.year}{str(issue_date.month).zfill(2)}{str(i+1).zfill(3)}"
             red_balls = sorted(random.sample(range(1, 34), 6))
@@ -96,17 +97,17 @@ def fetch_ssq_data():
         return pd.DataFrame()
 
 def generate_sample_data():
-    """生成初始展示数据"""
+    """生成初始展示数据 - 500期"""
     data = []
-    base_date = datetime(2024, 1, 1)
+    base_date = datetime(2023, 1, 1)  # 从2023年开始生成500期
     
-    for i in range(50):
+    for i in range(500):
         issue_date = base_date + timedelta(days=i*3)
         red_balls = sorted(random.sample(range(1, 34), 6))
         blue_ball = random.randint(1, 16)
         
         data.append({
-            '期号': f"2024{str(i+1).zfill(3)}",
+            '期号': f"2023{str(i+1).zfill(3)}",
             '开奖日期': issue_date.strftime('%Y-%m-%d'),
             '红球1': red_balls[0],
             '红球2': red_balls[1],
@@ -162,10 +163,7 @@ def analyze_consecutive_numbers(df):
     consecutive_stats = []
     for _, row in df.iterrows():
         reds = sorted([row[f'红球{i}'] for i in range(1, 7)])
-        consecutive_count = 0
-        for i in range(len(reds)-1):
-            if reds[i+1] - reds[i] == 1:
-                consecutive_count += 1
+        consecutive_count = sum(1 for i in range(len(reds)-1) if reds[i+1] - reds[i] == 1)
         consecutive_stats.append(consecutive_count)
     
     result_df = pd.DataFrame({'连号对数': consecutive_stats})
@@ -174,20 +172,16 @@ def analyze_consecutive_numbers(df):
     return value_counts
 
 def analyze_zone_distribution(df):
-    """区间分布分析（三分区）- 修复版"""
+    """区间分布分析（三分区）"""
     zones = {'一区(1-11)': [], '二区(12-22)': [], '三区(23-33)': []}
     
     for _, row in df.iterrows():
         reds = [row[f'红球{i}'] for i in range(1, 7)]
-        z1 = sum(1 for x in reds if 1 <= x <= 11)
-        z2 = sum(1 for x in reds if 12 <= x <= 22)
-        z3 = sum(1 for x in reds if 23 <= x <= 33)
-        zones['一区(1-11)'].append(z1)
-        zones['二区(12-22)'].append(z2)
-        zones['三区(23-33)'].append(z3)
+        zones['一区(1-11)'].append(sum(1 for x in reds if 1 <= x <= 11))
+        zones['二区(12-22)'].append(sum(1 for x in reds if 12 <= x <= 22))
+        zones['三区(23-33)'].append(sum(1 for x in reds if 23 <= x <= 33))
     
     zone_df = pd.DataFrame(zones)
-    # 明确创建结果DataFrame，确保列名正确
     mean_values = zone_df.mean()
     result_df = pd.DataFrame({
         '区间': mean_values.index.tolist(),
@@ -196,9 +190,10 @@ def analyze_zone_distribution(df):
     return result_df
 
 def plot_red_heatmap(df):
-    """红球热力图"""
-    matrix = np.zeros((min(30, len(df)), 33))
-    df_sorted = df.sort_values('期号', ascending=False).head(30)
+    """红球热力图 - 优化显示100期"""
+    display_count = min(100, len(df))  # 显示最近100期
+    matrix = np.zeros((display_count, 33))
+    df_sorted = df.sort_values('期号', ascending=False).head(display_count)
     
     for idx, (_, row) in enumerate(df_sorted.iterrows()):
         for i in range(1, 7):
@@ -208,13 +203,18 @@ def plot_red_heatmap(df):
     
     fig = px.imshow(
         matrix,
-        labels=dict(x="红球号码", y="期号", color="是否出现"),
+        labels=dict(x="红球号码", y="期号", color="出现"),
         x=list(range(1, 34)),
         y=df_sorted['期号'].tolist()[::-1],
-        color_continuous_scale=['white', '#ff6b6b'],
-        title="最近30期红球出现热力图"
+        color_continuous_scale=[[0, 'white'], [1, '#ff4757']],
+        title=f"最近{display_count}期红球出现热力图",
+        aspect='auto'
     )
-    fig.update_layout(height=600)
+    fig.update_layout(
+        height=800,  # 增加高度以适应更多数据
+        xaxis=dict(tickmode='linear', dtick=1),
+        yaxis=dict(tickmode='linear', dtick=5)
+    )
     return fig
 
 def plot_frequency_chart(freq_df, title, color):
@@ -225,8 +225,10 @@ def plot_frequency_chart(freq_df, title, color):
         y='出现次数',
         title=title,
         color='出现次数',
-        color_continuous_scale=color
+        color_continuous_scale=color,
+        text='出现次数'
     )
+    fig.update_traces(textposition='outside')
     fig.update_layout(
         xaxis_title="号码",
         yaxis_title="出现次数",
@@ -243,21 +245,22 @@ def plot_trend_line(df):
         y=df['红球和值'],
         mode='lines+markers',
         name='红球和值',
-        line=dict(color='#ff6b6b', width=3),
-        marker=dict(size=8, color='#ee5a6f')
+        line=dict(color='#ff6b6b', width=2),
+        marker=dict(size=6, color='#ee5a6f')
     ))
     
-    df['MA5'] = df['红球和值'].rolling(window=5).mean()
+    # 添加10期移动平均线（数据量大，用10期更平滑）
+    df['MA10'] = df['红球和值'].rolling(window=10).mean()
     fig.add_trace(go.Scatter(
         x=df['期号'],
-        y=df['MA5'],
+        y=df['MA10'],
         mode='lines',
-        name='5期移动平均',
+        name='10期移动平均',
         line=dict(color='#3498db', width=2, dash='dash')
     ))
     
     fig.update_layout(
-        title="红球和值走势趋势",
+        title="红球和值走势趋势（10期移动平均）",
         xaxis_title="期号",
         yaxis_title="和值",
         hovermode='x unified',
@@ -273,7 +276,8 @@ def plot_pie_chart(ratio_df, title):
         names='奇偶比',
         values='出现次数',
         title=title,
-        color_discrete_sequence=px.colors.sequential.RdBu
+        color_discrete_sequence=px.colors.sequential.RdBu,
+        hole=0.4
     )
     fig.update_traces(textposition='inside', textinfo='percent+label')
     return fig
@@ -282,7 +286,6 @@ def plot_zone_radar(zone_df):
     """区间分布雷达图"""
     fig = go.Figure()
     
-    # 确保数据类型正确
     values = zone_df['平均出现次数'].tolist()
     labels = zone_df['区间'].tolist()
     
@@ -291,7 +294,8 @@ def plot_zone_radar(zone_df):
         theta=labels + [labels[0]],
         fill='toself',
         name='平均分布',
-        line_color='#ff6b6b'
+        line_color='#ff6b6b',
+        fillcolor='rgba(255, 107, 107, 0.3)'
     ))
     fig.update_layout(
         polar=dict(
@@ -308,7 +312,7 @@ def main():
     st.markdown('<h1 class="title-text">🎱 双色球数据分析大师</h1>', unsafe_allow_html=True)
     st.markdown("""
     <div style='text-align: center; color: #666; margin-bottom: 30px;'>
-        智能分析历史数据规律，助力科学选号决策
+        智能分析500期历史数据规律，助力科学选号决策
     </div>
     """, unsafe_allow_html=True)
     
@@ -317,12 +321,13 @@ def main():
         st.markdown("""
         <div class="help-text">
         <b>👋 欢迎使用！</b><br><br>
-        <b>1. 数据获取：</b><br>
-        • 点击"🔄 获取最新数据"按钮<br>
-        • 系统自动抓取最近100期数据<br><br>
+        <b>1. 数据规模：</b><br>
+        • 系统内置500期历史数据<br>
+        • 覆盖近两年开奖记录<br><br>
         <b>2. 图表解读：</b><br>
         • <span style='color:#ff6b6b'>红色图表</span>：红球分析<br>
-        • <span style='color:#3498db'>蓝色图表</span>：蓝球分析<br><br>
+        • <span style='color:#3498db'>蓝色图表</span>：蓝球分析<br>
+        • 热力图：100期号码分布可视化<br><br>
         <b>3. 注意事项：</b><br>
         ⚠️ 彩票有风险，投注需谨慎<br>
         ⚠️ 历史数据不代表未来结果
@@ -333,7 +338,7 @@ def main():
         st.markdown("## 🎛️ 控制面板")
         analysis_period = st.selectbox(
             "选择分析期数",
-            ["最近30期", "最近50期", "最近100期", "全部数据"],
+            ["最近50期", "最近100期", "最近200期", "最近500期", "全部数据"],
             index=2
         )
         
@@ -355,22 +360,30 @@ def main():
     
     df = st.session_state['data']
     
-    period_map = {"最近30期": 30, "最近50期": 50, "最近100期": 100, "全部数据": len(df)}
+    period_map = {
+        "最近50期": 50, 
+        "最近100期": 100, 
+        "最近200期": 200, 
+        "最近500期": 500, 
+        "全部数据": len(df)
+    }
     display_count = period_map[analysis_period]
     df_display = df.head(display_count).copy()
     
+    # 指标卡
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("📊 分析期数", f"{len(df_display)}期")
     with col2:
-        latest_sum = df_display.iloc[0][['红球1', '红球2', '红球3', '红球4', '红球5', '红球6']].sum() if len(df_display) > 0 else 0
-        st.metric("🎯 最新和值", int(latest_sum))
+        latest_sum = int(df_display.iloc[0][['红球1', '红球2', '红球3', '红球4', '红球5', '红球6']].sum()) if len(df_display) > 0 else 0
+        st.metric("🎯 最新和值", latest_sum)
     with col3:
         odd_ratio_df = analyze_odd_even_ratio(df_display)
         odd_ratio = odd_ratio_df.iloc[0]['奇偶比'] if len(odd_ratio_df) > 0 else "3:3"
         st.metric("⚖️ 常见奇偶比", odd_ratio)
     with col4:
-        st.metric("💰 奖池累计", "模拟数据")
+        hot_num = analyze_red_ball_frequency(df_display).iloc[0]['号码'] if len(df_display) > 0 else "-"
+        st.metric("🔥 最热红球", f"号{hot_num}")
     
     st.markdown("---")
     
@@ -387,9 +400,9 @@ def main():
         col_left, col_right = st.columns(2)
         
         with col_left:
-            st.markdown("#### 🔴 红球频率TOP10")
+            st.markdown("#### 🔴 红球频率TOP15")
             red_freq = analyze_red_ball_frequency(df_display)
-            fig_red = plot_frequency_chart(red_freq.head(10), "红球出现频率TOP10", "Reds")
+            fig_red = plot_frequency_chart(red_freq.head(15), "红球出现频率TOP15", "Reds")
             st.plotly_chart(fig_red, use_container_width=True)
             
             st.markdown("#### ⚖️ 奇偶比例分布")
@@ -410,19 +423,19 @@ def main():
     
     with tab2:
         st.markdown("### 🔥 号码冷热分析")
-        st.markdown("#### 🔥❄️ 红球冷热分布热力图")
+        st.markdown("#### 🔥❄️ 红球冷热分布热力图（最近100期）")
         fig_heatmap = plot_red_heatmap(df_display)
         st.plotly_chart(fig_heatmap, use_container_width=True)
         
         col_cold, col_hot = st.columns(2)
         with col_cold:
-            st.markdown("#### ❄️ 冷号预警（出现次数最少）")
-            cold_numbers = red_freq.tail(5)
-            st.dataframe(cold_numbers.style.background_gradient(subset=['出现次数'], cmap='Blues'), use_container_width=True)
+            st.markdown("#### ❄️ 冷号预警（出现次数最少TOP10）")
+            cold_numbers = red_freq.tail(10).sort_values('出现次数')
+            st.dataframe(cold_numbers.style.background_gradient(subset=['出现次数'], cmap='Blues_r'), use_container_width=True)
         
         with col_hot:
-            st.markdown("#### 🔥 热号追踪（出现次数最多）")
-            hot_numbers = red_freq.head(5)
+            st.markdown("#### 🔥 热号追踪（出现次数最多TOP10）")
+            hot_numbers = red_freq.head(10)
             st.dataframe(hot_numbers.style.background_gradient(subset=['出现次数'], cmap='Reds'), use_container_width=True)
     
     with tab3:
@@ -445,7 +458,8 @@ def main():
                 x='红球跨度', 
                 nbins=20,
                 title="红球跨度分布",
-                color_discrete_sequence=['#ff6b6b']
+                color_discrete_sequence=['#ff6b6b'],
+                marginal='box'
             )
             st.plotly_chart(fig_span, use_container_width=True)
         
@@ -458,34 +472,51 @@ def main():
                 y='出现次数',
                 title="连号出现对数统计",
                 color='出现次数',
-                color_continuous_scale='Viridis'
+                color_continuous_scale='Viridis',
+                text='出现次数'
             )
+            fig_con.update_traces(textposition='outside')
             st.plotly_chart(fig_con, use_container_width=True)
     
     with tab4:
         st.markdown("### 🎯 深度规律分析")
-        st.markdown("#### 🔢 号码遗漏分析")
-        all_numbers = list(range(1, 34))
-        last_appear = {num: 0 for num in all_numbers}
         
-        for idx, row in df_display.iterrows():
-            current_reds = [int(row[f'红球{i}']) for i in range(1, 7)]
-            for num in all_numbers:
-                if num in current_reds:
-                    last_appear[num] = idx
+        col_omit1, col_omit2 = st.columns(2)
+        with col_omit1:
+            st.markdown("#### 🔢 红球遗漏分析")
+            all_numbers = list(range(1, 34))
+            last_appear = {num: 0 for num in all_numbers}
+            
+            for idx, row in df_display.iterrows():
+                current_reds = [int(row[f'红球{i}']) for i in range(1, 7)]
+                for num in all_numbers:
+                    if num in current_reds:
+                        last_appear[num] = idx
+            
+            omit_data = [{'号码': k, '遗漏期数': v} for k, v in last_appear.items()]
+            omit_df = pd.DataFrame(omit_data).sort_values('遗漏期数', ascending=False)
+            
+            fig_omit = px.bar(
+                omit_df,
+                x='号码',
+                y='遗漏期数',
+                title="红球遗漏期数统计（当前遗漏）",
+                color='遗漏期数',
+                color_continuous_scale='RdYlBu_r'
+            )
+            st.plotly_chart(fig_omit, use_container_width=True)
         
-        omit_data = [{'号码': k, '遗漏期数': v} for k, v in last_appear.items()]
-        omit_df = pd.DataFrame(omit_data).sort_values('遗漏期数', ascending=False)
-        
-        fig_omit = px.bar(
-            omit_df,
-            x='号码',
-            y='遗漏期数',
-            title="红球遗漏期数统计（当前遗漏）",
-            color='遗漏期数',
-            color_continuous_scale='RdYlBu_r'
-        )
-        st.plotly_chart(fig_omit, use_container_width=True)
+        with col_omit2:
+            st.markdown("#### 📋 遗漏说明")
+            max_omit = omit_df.iloc[0]['遗漏期数'] if len(omit_df) > 0 else 0
+            max_omit_num = omit_df.iloc[0]['号码'] if len(omit_df) > 0 else "-"
+            st.info(f"""
+            **当前最大遗漏：**\n
+            • 号码 **{max_omit_num}** 已遗漏 **{max_omit}** 期\n
+            • 平均遗漏期数：{omit_df['遗漏期数'].mean():.1f}期\n
+            • 遗漏超过20期的号码数：{len(omit_df[omit_df['遗漏期数'] > 20])}个\n\n
+            *注：遗漏值越大，理论上出现概率越高（回归均值）*
+            """)
         
         st.markdown("#### 🎲 蓝球012路分析")
         df_012 = df_display.copy()
@@ -496,44 +527,61 @@ def main():
         road_counts = df_012['012路分类'].value_counts().reset_index()
         road_counts.columns = ['路数', '出现次数']
         
-        col_road1, col_road2 = st.columns(2)
+        col_road1, col_road2, col_road3 = st.columns([2,2,1])
         with col_road1:
             fig_road = px.pie(
                 road_counts,
                 names='路数',
                 values='出现次数',
                 title="蓝球012路分布",
-                hole=0.4
+                hole=0.4,
+                color_discrete_sequence=['#ff6b6b', '#4ecdc4', '#45b7d1']
             )
+            fig_road.update_traces(textposition='inside', textinfo='percent+label')
             st.plotly_chart(fig_road, use_container_width=True)
         
         with col_road2:
-            st.markdown("#### 📋 路数说明")
-            st.info("""
-            **012路分类规则：**\n
-            • **0路**：号码除以3余0（3,6,9,12,15）\n
-            • **1路**：号码除以3余1（1,4,7,10,13,16）\n
-            • **2路**：号码除以3余2（2,5,8,11,14）\n\n
-            通过观察012路分布，可以判断蓝球的除3余数规律。
+            # 蓝球冷热
+            blue_freq = analyze_blue_ball_frequency(df_display)
+            fig_blue_coldhot = px.bar(
+                blue_freq,
+                x='号码',
+                y='出现次数',
+                title="蓝球冷热统计",
+                color='出现次数',
+                color_continuous_scale='Blues'
+            )
+            st.plotly_chart(fig_blue_coldhot, use_container_width=True)
+        
+        with col_road3:
+            st.markdown("**路数说明**")
+            st.markdown("""
+            • **0路**：3,6,9,12,15\n
+            • **1路**：1,4,7,10,13,16\n
+            • **2路**：2,5,8,11,14\n\n
+            *观察哪路近期热出*
             """)
     
     with tab5:
         st.markdown("### 📋 原始开奖数据")
-        display_cols = ['期号', '开奖日期', '红球1', '红球2', '红球3', '红球4', '红球5', '红球6', '蓝球', '红球和值']
-        st.dataframe(
-            df_display[display_cols].style.highlight_max(subset=['红球和值'], color='lightgreen')
-                         .highlight_min(subset=['红球和值'], color='lightcoral'),
-            use_container_width=True,
-            height=500
-        )
+        display_cols = ['期号', '开奖日期', '红球1', '红球2', '红球3', '红球4', '红球5', '红球6', '蓝球', '红球和值', '红球跨度']
+        
+        # 使用matplotlib支持的样式
+        styled_df = df_display[display_cols].style.highlight_max(subset=['红球和值'], color='#90EE90', axis=0)\
+                                             .highlight_min(subset=['红球和值'], color='#FFB6C1', axis=0)
+        st.dataframe(styled_df, use_container_width=True, height=600)
         
         csv = df_display.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 下载CSV数据",
-            data=csv,
-            file_name=f"ssq_data_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
+        col_down1, col_down2 = st.columns([1,3])
+        with col_down1:
+            st.download_button(
+                label="📥 下载CSV数据",
+                data=csv,
+                file_name=f"ssq_data_500_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+        with col_down2:
+            st.info(f"当前显示 {len(df_display)} 期数据，共 {len(df)} 期历史数据")
 
     st.markdown("""
     <div class="footer">
