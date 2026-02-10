@@ -24,6 +24,19 @@ hide_streamlit_style = """
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 .stDeployButton {display:none;}
+
+/* 移动端优化：禁用图表区域的默认触摸行为 */
+.js-plotly-plot {
+    touch-action: pan-y !important;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* 确保页面可以正常滚动 */
+.main {
+    touch-action: pan-y;
+}
 </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -33,15 +46,12 @@ st.markdown("""
 <style>
     .title-text {
         font-family: 'Helvetica Neue', sans-serif;
-        color: #ff6b6b;  /* 使用纯红色 */
+        background: linear-gradient(120deg, #ff6b6b, #ee5a6f);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         font-weight: 800;
         text-align: center;
         padding: 20px 0;
-        font-size: 2.5rem;
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        padding: 25px;
-        border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
     .help-text {
         background: #f8f9fa;
@@ -72,7 +82,6 @@ def fetch_ssq_data():
         data = []
         base_date = datetime.now()
         
-        # 生成500期数据
         for i in range(500):
             issue_date = base_date - timedelta(days=i*3)
             issue_no = f"{issue_date.year}{str(issue_date.month).zfill(2)}{str(i+1).zfill(3)}"
@@ -102,7 +111,7 @@ def fetch_ssq_data():
 def generate_sample_data():
     """生成初始展示数据 - 500期"""
     data = []
-    base_date = datetime(2023, 1, 1)  # 从2023年开始生成500期
+    base_date = datetime(2023, 1, 1)
     
     for i in range(500):
         issue_date = base_date + timedelta(days=i*3)
@@ -193,8 +202,8 @@ def analyze_zone_distribution(df):
     return result_df
 
 def plot_red_heatmap(df):
-    """红球热力图 - 优化显示100期"""
-    display_count = min(100, len(df))  # 显示最近100期
+    """红球热力图 - 移动端优化：禁用缩放和选择"""
+    display_count = min(100, len(df))
     matrix = np.zeros((display_count, 33))
     df_sorted = df.sort_values('期号', ascending=False).head(display_count)
     
@@ -213,15 +222,26 @@ def plot_red_heatmap(df):
         title=f"最近{display_count}期红球出现热力图",
         aspect='auto'
     )
+    
+    # 移动端优化：禁用所有交互模式
     fig.update_layout(
-        height=800,  # 增加高度以适应更多数据
-        xaxis=dict(tickmode='linear', dtick=1),
-        yaxis=dict(tickmode='linear', dtick=5)
+        height=800,
+        xaxis=dict(tickmode='linear', dtick=1, fixedrange=True),  # 禁用x轴缩放
+        yaxis=dict(tickmode='linear', dtick=5, fixedrange=True),  # 禁用y轴缩放
+        dragmode=False,  # 禁用拖拽
+        selectdirection=None,  # 禁用选择方向
+        hovermode='closest'  # 优化hover体验
     )
+    
+    # 禁用所有鼠标/触摸交互模式
+    fig.update_traces(
+        hovertemplate='期号: %{y}<br>号码: %{x}<br>状态: %{z}<extra></extra>'
+    )
+    
     return fig
 
 def plot_frequency_chart(freq_df, title, color):
-    """频率柱状图"""
+    """频率柱状图 - 移动端优化"""
     fig = px.bar(
         freq_df,
         x='号码',
@@ -236,12 +256,17 @@ def plot_frequency_chart(freq_df, title, color):
         xaxis_title="号码",
         yaxis_title="出现次数",
         plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)'
+        paper_bgcolor='rgba(0,0,0,0)',
+        # 移动端优化
+        xaxis=dict(fixedrange=True),  # 禁用x轴缩放
+        yaxis=dict(fixedrange=True),  # 禁用y轴缩放
+        dragmode=False,
+        showlegend=False
     )
     return fig
 
 def plot_trend_line(df):
-    """和值趋势线"""
+    """和值趋势线 - 移动端优化"""
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=df['期号'],
@@ -249,17 +274,19 @@ def plot_trend_line(df):
         mode='lines+markers',
         name='红球和值',
         line=dict(color='#ff6b6b', width=2),
-        marker=dict(size=6, color='#ee5a6f')
+        marker=dict(size=4, color='#ee5a6f'),  # 减小标记点，避免误触
+        hovertemplate='期号: %{x}<br>和值: %{y}<extra></extra>'
     ))
     
-    # 添加10期移动平均线（数据量大，用10期更平滑）
+    # 添加10期移动平均线
     df['MA10'] = df['红球和值'].rolling(window=10).mean()
     fig.add_trace(go.Scatter(
         x=df['期号'],
         y=df['MA10'],
         mode='lines',
         name='10期移动平均',
-        line=dict(color='#3498db', width=2, dash='dash')
+        line=dict(color='#3498db', width=2, dash='dash'),
+        hovertemplate='期号: %{x}<br>10期均值: %{y:.1f}<extra></extra>'
     ))
     
     fig.update_layout(
@@ -268,12 +295,24 @@ def plot_trend_line(df):
         yaxis_title="和值",
         hovermode='x unified',
         plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)'
+        paper_bgcolor='rgba(0,0,0,0)',
+        # 移动端优化：禁用缩放但保留悬停
+        xaxis=dict(fixedrange=True, tickangle=45, nticks=10),  # 减少x轴标签数量
+        yaxis=dict(fixedrange=True),
+        dragmode=False,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
     return fig
 
 def plot_pie_chart(ratio_df, title):
-    """饼图"""
+    """饼图 - 移动端优化"""
     fig = px.pie(
         ratio_df,
         names='奇偶比',
@@ -282,11 +321,19 @@ def plot_pie_chart(ratio_df, title):
         color_discrete_sequence=px.colors.sequential.RdBu,
         hole=0.4
     )
-    fig.update_traces(textposition='inside', textinfo='percent+label')
+    fig.update_traces(
+        textposition='inside', 
+        textinfo='percent+label',
+        hovertemplate='%{label}: %{value}次 (%{percent})<extra></extra>'
+    )
+    fig.update_layout(
+        dragmode=False,
+        showlegend=False
+    )
     return fig
 
 def plot_zone_radar(zone_df):
-    """区间分布雷达图"""
+    """区间分布雷达图 - 移动端优化"""
     fig = go.Figure()
     
     values = zone_df['平均出现次数'].tolist()
@@ -298,7 +345,8 @@ def plot_zone_radar(zone_df):
         fill='toself',
         name='平均分布',
         line_color='#ff6b6b',
-        fillcolor='rgba(255, 107, 107, 0.3)'
+        fillcolor='rgba(255, 107, 107, 0.3)',
+        hovertemplate='%{theta}: %{r:.2f}<extra></extra>'
     ))
     fig.update_layout(
         polar=dict(
@@ -307,7 +355,8 @@ def plot_zone_radar(zone_df):
                 range=[0, max(values) * 1.2]
             )),
         showlegend=False,
-        title="红球三区分布雷达图"
+        title="红球三区分布雷达图",
+        dragmode=False  # 禁用拖拽
     )
     return fig
 
@@ -327,10 +376,10 @@ def main():
         <b>1. 数据规模：</b><br>
         • 系统内置500期历史数据<br>
         • 覆盖近两年开奖记录<br><br>
-        <b>2. 图表解读：</b><br>
-        • <span style='color:#ff6b6b'>红色图表</span>：红球分析<br>
-        • <span style='color:#3498db'>蓝色图表</span>：蓝球分析<br>
-        • 热力图：100期号码分布可视化<br><br>
+        <b>2. 移动端优化：</b><br>
+        • 图表支持点击查看详情<br>
+        • 长按查看数据提示<br>
+        • 滑动页面更流畅<br><br>
         <b>3. 注意事项：</b><br>
         ⚠️ 彩票有风险，投注需谨慎<br>
         ⚠️ 历史数据不代表未来结果
@@ -406,29 +455,39 @@ def main():
             st.markdown("#### 🔴 红球频率TOP15")
             red_freq = analyze_red_ball_frequency(df_display)
             fig_red = plot_frequency_chart(red_freq.head(15), "红球出现频率TOP15", "Reds")
-            st.plotly_chart(fig_red, use_container_width=True)
+            st.plotly_chart(fig_red, use_container_width=True, config={'displayModeBar': False})  # 隐藏工具栏
             
             st.markdown("#### ⚖️ 奇偶比例分布")
             odd_even_df = analyze_odd_even_ratio(df_display)
             fig_pie = plot_pie_chart(odd_even_df, "奇偶比例分布")
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
         
         with col_right:
             st.markdown("#### 🔵 蓝球频率统计")
             blue_freq = analyze_blue_ball_frequency(df_display)
             fig_blue = plot_frequency_chart(blue_freq, "蓝球出现频率", "Blues")
-            st.plotly_chart(fig_blue, use_container_width=True)
+            st.plotly_chart(fig_blue, use_container_width=True, config={'displayModeBar': False})
             
             st.markdown("#### 🗺️ 三区分布雷达")
             zone_df = analyze_zone_distribution(df_display)
             fig_radar = plot_zone_radar(zone_df)
-            st.plotly_chart(fig_radar, use_container_width=True)
+            st.plotly_chart(fig_radar, use_container_width=True, config={'displayModeBar': False})
     
     with tab2:
         st.markdown("### 🔥 号码冷热分析")
         st.markdown("#### 🔥❄️ 红球冷热分布热力图（最近100期）")
         fig_heatmap = plot_red_heatmap(df_display)
-        st.plotly_chart(fig_heatmap, use_container_width=True)
+        # 热力图配置：禁用所有交互工具栏
+        st.plotly_chart(
+            fig_heatmap, 
+            use_container_width=True, 
+            config={
+                'displayModeBar': False,  # 隐藏工具栏
+                'scrollZoom': False,      # 禁用滚动缩放
+                'doubleClick': False,     # 禁用双击
+                'showTips': False         # 禁用提示
+            }
+        )
         
         col_cold, col_hot = st.columns(2)
         with col_cold:
@@ -446,7 +505,7 @@ def main():
         st.markdown("#### 📈 红球和值走势")
         sum_trend = analyze_sum_trend(df_display)
         fig_trend = plot_trend_line(sum_trend)
-        st.plotly_chart(fig_trend, use_container_width=True)
+        st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
         
         col_trend1, col_trend2 = st.columns(2)
         with col_trend1:
@@ -464,7 +523,13 @@ def main():
                 color_discrete_sequence=['#ff6b6b'],
                 marginal='box'
             )
-            st.plotly_chart(fig_span, use_container_width=True)
+            # 禁用交互
+            fig_span.update_layout(
+                xaxis=dict(fixedrange=True),
+                yaxis=dict(fixedrange=True),
+                dragmode=False
+            )
+            st.plotly_chart(fig_span, use_container_width=True, config={'displayModeBar': False})
         
         with col_trend2:
             st.markdown("#### 🔄 连号统计")
@@ -479,7 +544,12 @@ def main():
                 text='出现次数'
             )
             fig_con.update_traces(textposition='outside')
-            st.plotly_chart(fig_con, use_container_width=True)
+            fig_con.update_layout(
+                xaxis=dict(fixedrange=True),
+                yaxis=dict(fixedrange=True),
+                dragmode=False
+            )
+            st.plotly_chart(fig_con, use_container_width=True, config={'displayModeBar': False})
     
     with tab4:
         st.markdown("### 🎯 深度规律分析")
@@ -507,7 +577,12 @@ def main():
                 color='遗漏期数',
                 color_continuous_scale='RdYlBu_r'
             )
-            st.plotly_chart(fig_omit, use_container_width=True)
+            fig_omit.update_layout(
+                xaxis=dict(fixedrange=True, tickmode='linear', dtick=2),
+                yaxis=dict(fixedrange=True),
+                dragmode=False
+            )
+            st.plotly_chart(fig_omit, use_container_width=True, config={'displayModeBar': False})
         
         with col_omit2:
             st.markdown("#### 📋 遗漏说明")
@@ -541,10 +616,10 @@ def main():
                 color_discrete_sequence=['#ff6b6b', '#4ecdc4', '#45b7d1']
             )
             fig_road.update_traces(textposition='inside', textinfo='percent+label')
-            st.plotly_chart(fig_road, use_container_width=True)
+            fig_road.update_layout(dragmode=False)
+            st.plotly_chart(fig_road, use_container_width=True, config={'displayModeBar': False})
         
         with col_road2:
-            # 蓝球冷热
             blue_freq = analyze_blue_ball_frequency(df_display)
             fig_blue_coldhot = px.bar(
                 blue_freq,
@@ -554,7 +629,12 @@ def main():
                 color='出现次数',
                 color_continuous_scale='Blues'
             )
-            st.plotly_chart(fig_blue_coldhot, use_container_width=True)
+            fig_blue_coldhot.update_layout(
+                xaxis=dict(fixedrange=True),
+                yaxis=dict(fixedrange=True),
+                dragmode=False
+            )
+            st.plotly_chart(fig_blue_coldhot, use_container_width=True, config={'displayModeBar': False})
         
         with col_road3:
             st.markdown("**路数说明**")
@@ -569,7 +649,6 @@ def main():
         st.markdown("### 📋 原始开奖数据")
         display_cols = ['期号', '开奖日期', '红球1', '红球2', '红球3', '红球4', '红球5', '红球6', '蓝球', '红球和值', '红球跨度']
         
-        # 使用matplotlib支持的样式
         styled_df = df_display[display_cols].style.highlight_max(subset=['红球和值'], color='#90EE90', axis=0)\
                                              .highlight_min(subset=['红球和值'], color='#FFB6C1', axis=0)
         st.dataframe(styled_df, use_container_width=True, height=600)
@@ -594,5 +673,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
