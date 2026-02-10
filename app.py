@@ -39,6 +39,7 @@ st.markdown("""
         font-weight: 800;
         text-align: center;
         padding: 20px 0;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);  /* 添加文字阴影增强可见性 */
     }
     .help-text {
         background: #f8f9fa;
@@ -591,3 +592,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
