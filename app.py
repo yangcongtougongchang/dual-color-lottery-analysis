@@ -11,9 +11,10 @@ from datetime import datetime
 import io
 from matplotlib.font_manager import FontProperties
 import matplotlib
-matplotlib.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
-matplotlib.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
-
+# matplotlib.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+# matplotlib.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
+plt.rcParams['font.sans-serif']=['SimHei'] #用来正常显示中文标签
+plt.rcParams['axes.unicode_minus']=False #用来正常显示负号
 # 设置页面配置
 st.set_page_config(
     page_title="双色球历史数据规律分析",
