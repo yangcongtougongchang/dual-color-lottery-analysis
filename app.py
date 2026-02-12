@@ -9,11 +9,76 @@ import time
 import random
 from datetime import datetime
 import io
-from matplotlib.font_manager import FontProperties
-import matplotlib
 import matplotlib.font_manager as fm
-plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False
+import matplotlib
+import platform
+import os
+
+# ============= 解决中文显示乱码问题 =============
+def setup_chinese_font():
+    """自动配置系统支持的中文字体"""
+    import matplotlib.font_manager as fm
+    
+    # 常见的支持中文的字体名称（按系统分类）
+    chinese_fonts = []
+    
+    # Windows系统字体
+    chinese_fonts.extend(['Microsoft YaHei', 'SimHei', 'SimSun', 'FangSong', 'KaiTi'])
+    
+    # macOS系统字体
+    chinese_fonts.extend(['PingFang SC', 'Heiti SC', 'Apple LiGothic', 'Apple LiSung', 'Arial Unicode MS'])
+    
+    # Linux系统字体
+    chinese_fonts.extend(['WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK SC', 'Noto Sans CJK JP'])
+    
+    # 通用字体
+    chinese_fonts.extend(['Arial Unicode MS', 'DejaVu Sans'])
+    
+    # 查找系统中已安装的中文字体
+    available_fonts = []
+    for font in chinese_fonts:
+        try:
+            # 检查字体是否存在
+            font_path = fm.findfont(font, fallback_to_default=False)
+            if font_path:
+                available_fonts.append(font)
+        except:
+            continue
+    
+    if available_fonts:
+        # 使用第一个可用的中文字体
+        font_name = available_fonts[0]
+        plt.rcParams['font.sans-serif'] = [font_name] + ['DejaVu Sans']
+        plt.rcParams['font.family'] = 'sans-serif'
+        print(f"✅ 成功加载中文字体: {font_name}")
+    else:
+        # 如果没有找到中文字体，使用默认字体并给出警告
+        print("⚠️ 未找到中文字体，图表将使用英文显示")
+        plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+    
+    plt.rcParams['axes.unicode_minus'] = False
+    return available_fonts
+
+# 调用字体设置函数
+setup_chinese_font()
+
+# 创建图表的辅助函数，确保中文显示正常
+def create_fig_ax(figsize=(12, 6)):
+    """创建图表和轴对象，确保中文显示正常"""
+    fig, ax = plt.subplots(figsize=figsize)
+    # 重新应用字体设置
+    setup_chinese_font()
+    return fig, ax
+
+# 设置seaborn样式
+sns.set_style("whitegrid")
+try:
+    if setup_chinese_font():
+        sns.set(font=setup_chinese_font()[0] if setup_chinese_font() else 'DejaVu Sans')
+except:
+    pass
+# ================================================
+
 # 设置页面配置
 st.set_page_config(
     page_title="双色球历史数据规律分析",
@@ -21,15 +86,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# 创建图表的辅助函数，确保中文显示正常
-def create_fig_ax(figsize=(12, 6)):
-    """创建图表和轴对象，确保中文显示正常"""
-    fig, ax = plt.subplots(figsize=figsize)
-    # 再次设置字体，确保图表级别应用
-    plt.rcParams['font.sans-serif'] = matplotlib.rcParams['font.sans-serif']
-    plt.rcParams['axes.unicode_minus'] = False
-    return fig, ax
 
 # 自定义CSS，隐藏GitHub图标但保留header
 hide_github_style = """
@@ -330,7 +386,7 @@ if selected_analysis == "基本数据概览":
         st.subheader("💾 数据导出")
         col1, col2 = st.columns(2)
         with col1:
-            csv = filtered_df.to_csv(index=False).encode('utf-8')
+            csv = filtered_df.to_csv(index=False).encode('utf-8-sig')  # 使用utf-8-sig编码
             st.download_button(
                 label="📥 导出CSV",
                 data=csv,
@@ -385,6 +441,7 @@ elif selected_analysis == "红球号码分析":
                     f'{int(height)}', ha='center', va='bottom')
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 热力图显示号码分布
         st.markdown("### 🔥 红球号码热力图")
@@ -400,6 +457,7 @@ elif selected_analysis == "红球号码分析":
         ax.set_title(f'红球号码出现次数热力图 ({len(filtered_df)}期数据)')
         ax.set_xlabel('红球号码')
         st.pyplot(fig)
+        plt.close(fig)
         
         # 红球区间分布
         st.markdown("### 📈 红球区间分布")
@@ -426,6 +484,7 @@ elif selected_analysis == "红球号码分析":
                     f'{int(height)}', ha='center', va='bottom')
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 出现频率最高的前10个红球
         st.markdown("### 🏆 红球出现频率TOP10")
@@ -470,7 +529,7 @@ elif selected_analysis == "蓝球号码分析":
             '出现频率': (blue_freq.values / len(filtered_df) * 100).round(2)
         })
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         bars = ax.bar(blue_freq_df['号码'], blue_freq_df['出现次数'], color='blue', alpha=0.7)
         ax.set_xlabel('蓝球号码')
         ax.set_ylabel('出现次数')
@@ -483,34 +542,37 @@ elif selected_analysis == "蓝球号码分析":
                     f'{int(height)}', ha='center', va='bottom')
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 蓝球奇偶分布
         st.markdown("### 🔢 蓝球奇偶分布")
         even_count = (filtered_df['蓝球'] % 2 == 0).sum()
         odd_count = (filtered_df['蓝球'] % 2 == 1).sum()
         
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = create_fig_ax(figsize=(8, 6))
         ax.pie([even_count, odd_count], labels=['偶数', '奇数'], autopct='%1.1f%%',
                colors=['#6699CC', '#336699'], startangle=90)
         ax.set_title(f'蓝球奇偶分布 ({len(filtered_df)}期数据)')
         st.pyplot(fig)
+        plt.close(fig)
         
         # 蓝球大小分布（1-8为小，9-16为大）
         st.markdown("### 📏 蓝球大小分布")
         small_count = (filtered_df['蓝球'] <= 8).sum()
         big_count = (filtered_df['蓝球'] > 8).sum()
         
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = create_fig_ax(figsize=(8, 6))
         ax.pie([small_count, big_count], labels=['小号(1-8)', '大号(9-16)'], autopct='%1.1f%%',
                colors=['#99CCFF', '#3366CC'], startangle=90)
         ax.set_title(f'蓝球大小分布 ({len(filtered_df)}期数据)')
         st.pyplot(fig)
+        plt.close(fig)
         
         # 蓝球走势图
         st.markdown("### 📈 蓝球走势折线图")
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(filtered_df['期号'], filtered_df['蓝球'], marker='o', linestyle='-', color='blue')
-        ax.set_xlabel('期号')
+        fig, ax = create_fig_ax(figsize=(12, 6))
+        ax.plot(range(len(filtered_df)), filtered_df['蓝球'], marker='o', linestyle='-', color='blue')
+        ax.set_xlabel('期次')
         ax.set_ylabel('蓝球号码')
         ax.set_title('蓝球号码走势')
         ax.grid(True, linestyle='--', alpha=0.7)
@@ -518,12 +580,15 @@ elif selected_analysis == "蓝球号码分析":
         # 只显示部分期号标签，避免重叠
         if len(filtered_df) > 20:
             step = len(filtered_df) // 10
-            ax.set_xticks(filtered_df['期号'][::step])
-            ax.set_xticklabels(filtered_df['期号'][::step], rotation=45)
+            ax.set_xticks(range(0, len(filtered_df), step))
+            ax.set_xticklabels(filtered_df['期号'].iloc[::step], rotation=45)
         else:
+            ax.set_xticks(range(len(filtered_df)))
             ax.set_xticklabels(filtered_df['期号'], rotation=45)
         
+        fig.tight_layout()
         st.pyplot(fig)
+        plt.close(fig)
         
         # 出现频率最高的前5个蓝球
         st.markdown("### 🏆 蓝球出现频率TOP5")
@@ -565,7 +630,7 @@ elif selected_analysis == "号码组合分析":
         filtered_df['奇偶比'] = filtered_df.apply(calculate_odd_even_ratio, axis=1)
         odd_even_counts = filtered_df['奇偶比'].value_counts().sort_index()
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         bars = ax.bar(odd_even_counts.index, odd_even_counts.values, color='purple', alpha=0.7)
         ax.set_xlabel('奇偶比')
         ax.set_ylabel('出现次数')
@@ -578,6 +643,7 @@ elif selected_analysis == "号码组合分析":
                     f'{int(height)}', ha='center', va='bottom')
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 大小比分析（1-16为小，17-33为大）
         st.markdown("### 📏 红球大小比分析")
@@ -591,7 +657,7 @@ elif selected_analysis == "号码组合分析":
         filtered_df['大小比'] = filtered_df.apply(calculate_big_small_ratio, axis=1)
         big_small_counts = filtered_df['大小比'].value_counts().sort_index()
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         bars = ax.bar(big_small_counts.index, big_small_counts.values, color='green', alpha=0.7)
         ax.set_xlabel('大小比')
         ax.set_ylabel('出现次数')
@@ -604,6 +670,7 @@ elif selected_analysis == "号码组合分析":
                     f'{int(height)}', ha='center', va='bottom')
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 连号分析
         st.markdown("### 🔗 红球连号分析")
@@ -619,7 +686,7 @@ elif selected_analysis == "号码组合分析":
         filtered_df['连号数'] = filtered_df.apply(count_consecutive_pairs, axis=1)
         consecutive_counts = filtered_df['连号数'].value_counts().sort_index()
         
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = create_fig_ax(figsize=(10, 6))
         bars = ax.bar(consecutive_counts.index, consecutive_counts.values, color='orange', alpha=0.7)
         ax.set_xlabel('连号对数')
         ax.set_ylabel('出现次数')
@@ -632,6 +699,7 @@ elif selected_analysis == "号码组合分析":
                     f'{int(height)}', ha='center', va='bottom')
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 和值分析
         st.markdown("### 📊 红球和值分析")
@@ -641,7 +709,7 @@ elif selected_analysis == "号码组合分析":
         
         filtered_df['和值'] = filtered_df.apply(calculate_sum, axis=1)
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         ax.hist(filtered_df['和值'], bins=20, color='cyan', alpha=0.7, edgecolor='black')
         ax.set_xlabel('和值')
         ax.set_ylabel('出现次数')
@@ -649,6 +717,7 @@ elif selected_analysis == "号码组合分析":
         ax.grid(True, linestyle='--', alpha=0.7)
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 显示统计信息
         st.markdown("### 📋 和值统计信息")
@@ -674,7 +743,7 @@ elif selected_analysis == "号码组合分析":
         
         filtered_df['跨度'] = filtered_df.apply(calculate_span, axis=1)
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         ax.hist(filtered_df['跨度'], bins=15, color='brown', alpha=0.7, edgecolor='black')
         ax.set_xlabel('跨度')
         ax.set_ylabel('出现次数')
@@ -682,6 +751,7 @@ elif selected_analysis == "号码组合分析":
         ax.grid(True, linestyle='--', alpha=0.7)
         
         st.pyplot(fig)
+        plt.close(fig)
     else:
         st.warning("暂无数据，请检查数据加载情况")
 
@@ -692,7 +762,7 @@ elif selected_analysis == "历史趋势分析":
     if not filtered_df.empty:
         # 奖池趋势
         st.markdown("### 💰 奖池金额趋势")
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         ax.plot(filtered_df['开奖日期'], filtered_df['奖池(元)'] / 100000000, marker='o', linestyle='-', color='gold')
         ax.set_xlabel('开奖日期')
         ax.set_ylabel('奖池金额（亿元）')
@@ -704,6 +774,7 @@ elif selected_analysis == "历史趋势分析":
         fig.tight_layout()
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 红球和值趋势
         st.markdown("### 📊 红球和值趋势")
@@ -713,7 +784,7 @@ elif selected_analysis == "历史趋势分析":
         
         filtered_df['和值'] = filtered_df.apply(calculate_sum, axis=1)
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         ax.plot(filtered_df['开奖日期'], filtered_df['和值'], marker='o', linestyle='-', color='red')
         ax.set_xlabel('开奖日期')
         ax.set_ylabel('和值')
@@ -730,6 +801,7 @@ elif selected_analysis == "历史趋势分析":
         fig.tight_layout()
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 蓝球大小趋势（1-8为小，9-16为大）
         st.markdown("### 🔵 蓝球大小趋势")
@@ -738,7 +810,7 @@ elif selected_analysis == "历史趋势分析":
         # 计算每期的大小分布
         size_trend = filtered_df.groupby('开奖日期')['蓝球大小'].value_counts().unstack(fill_value=0)
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         if '小' in size_trend.columns and '大' in size_trend.columns:
             ax.plot(size_trend.index, size_trend['小'], marker='o', linestyle='-', color='lightblue', label='小号(1-8)')
             ax.plot(size_trend.index, size_trend['大'], marker='o', linestyle='-', color='darkblue', label='大号(9-16)')
@@ -752,6 +824,7 @@ elif selected_analysis == "历史趋势分析":
         fig.tight_layout()
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 红球奇偶趋势
         st.markdown("### 🔴 红球奇偶趋势")
@@ -765,7 +838,7 @@ elif selected_analysis == "历史趋势分析":
         odd_even_trend = filtered_df.apply(count_odd_even, axis=1)
         odd_even_trend.index = filtered_df['开奖日期']
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         ax.plot(odd_even_trend.index, odd_even_trend['奇数'], marker='o', linestyle='-', color='red', label='奇数')
         ax.plot(odd_even_trend.index, odd_even_trend['偶数'], marker='o', linestyle='-', color='blue', label='偶数')
         ax.set_xlabel('开奖日期')
@@ -778,6 +851,7 @@ elif selected_analysis == "历史趋势分析":
         fig.tight_layout()
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 红球区间趋势
         st.markdown("### 📈 红球区间趋势")
@@ -792,7 +866,7 @@ elif selected_analysis == "历史趋势分析":
         range_trend = filtered_df.apply(count_ranges, axis=1)
         range_trend.index = filtered_df['开奖日期']
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         ax.plot(range_trend.index, range_trend['小号区(1-11)'], marker='o', linestyle='-', color='green', label='小号区(1-11)')
         ax.plot(range_trend.index, range_trend['中号区(12-22)'], marker='o', linestyle='-', color='orange', label='中号区(12-22)')
         ax.plot(range_trend.index, range_trend['大号区(23-33)'], marker='o', linestyle='-', color='red', label='大号区(23-33)')
@@ -806,6 +880,7 @@ elif selected_analysis == "历史趋势分析":
         fig.tight_layout()
         
         st.pyplot(fig)
+        plt.close(fig)
         
         # 红球号码热度趋势
         st.markdown("### 🔥 红球号码热度趋势")
@@ -822,7 +897,7 @@ elif selected_analysis == "历史趋势分析":
         window_size = 10
         filtered_df[f'号码{selected_number}_热度'] = filtered_df[f'号码{selected_number}_出现'].rolling(window=window_size).mean() * 10
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = create_fig_ax(figsize=(12, 6))
         ax.plot(filtered_df['开奖日期'], filtered_df[f'号码{selected_number}_热度'], marker='o', linestyle='-', color='red')
         ax.set_xlabel('开奖日期')
         ax.set_ylabel(f'号码{selected_number}热度（10期移动平均）')
@@ -833,6 +908,7 @@ elif selected_analysis == "历史趋势分析":
         fig.tight_layout()
         
         st.pyplot(fig)
+        plt.close(fig)
     else:
         st.warning("暂无数据，请检查数据加载情况")
 
