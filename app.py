@@ -11,7 +11,17 @@ from datetime import datetime
 import io
 from matplotlib.font_manager import FontProperties
 import matplotlib
+import matplotlib.font_manager as fm
+# Windows
+plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+# macOS
+# plt.rcParams['font.sans-serif'] = ['PingFang SC', 'Heiti SC']
+# Linux
+# plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei']
+plt.rcParams['axes.unicode_minus'] = False
 # 尝试设置中文字体，添加多个备选字体
+
+
 try:
     # 检查可用字体
     from matplotlib.font_manager import FontManager
