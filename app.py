@@ -13,71 +13,113 @@ import matplotlib.font_manager as fm
 import matplotlib
 import platform
 import os
+import warnings
+warnings.filterwarnings('ignore')
 
-# ============= 解决中文显示乱码问题 =============
-def setup_chinese_font():
-    """自动配置系统支持的中文字体"""
-    import matplotlib.font_manager as fm
+# ============= 全面解决matplotlib中文显示问题 =============
+def setup_matplotlib_chinese():
+    """配置matplotlib支持中文显示（参考SmartClean方案）"""
     
-    # 常见的支持中文的字体名称（按系统分类）
-    chinese_fonts = []
+    # 1. 设置seaborn样式（seaborn会自动配置更好的字体）
+    sns.set_style("whitegrid")
+    sns.set_context("notebook", font_scale=1.1)
     
-    # Windows系统字体
-    chinese_fonts.extend(['Microsoft YaHei', 'SimHei', 'SimSun', 'FangSong', 'KaiTi'])
+    # 2. 根据操作系统设置字体优先级
+    system = platform.system()
     
-    # macOS系统字体
-    chinese_fonts.extend(['PingFang SC', 'Heiti SC', 'Apple LiGothic', 'Apple LiSung', 'Arial Unicode MS'])
+    if system == 'Windows':
+        font_priorities = [
+            'Microsoft YaHei',      # 微软雅黑
+            'SimHei',              # 黑体
+            'SimSun',              # 宋体
+            'FangSong',            # 仿宋
+            'KaiTi',              # 楷体
+            'Arial Unicode MS'
+        ]
+    elif system == 'Darwin':  # macOS
+        font_priorities = [
+            'PingFang SC',         # 苹方
+            'Heiti SC',            # 黑体-简
+            'STHeiti',            # 华文黑体
+            'Apple LiGothic',     # 苹果俪中黑
+            'Arial Unicode MS'
+        ]
+    else:  # Linux
+        font_priorities = [
+            'WenQuanYi Micro Hei', # 文泉驿微米黑
+            'WenQuanYi Zen Hei',   # 文泉驿正黑
+            'Noto Sans CJK SC',    # 思源黑体
+            'Noto Sans CJK JP',
+            'Droid Sans Fallback'
+        ]
     
-    # Linux系统字体
-    chinese_fonts.extend(['WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK SC', 'Noto Sans CJK JP'])
+    # 3. 添加通用后备字体
+    font_priorities.extend(['DejaVu Sans', 'Arial', 'Tahoma'])
     
-    # 通用字体
-    chinese_fonts.extend(['Arial Unicode MS', 'DejaVu Sans'])
+    # 4. 尝试注册系统字体
+    font_dirs = []
+    if system == 'Windows':
+        font_dirs = ['C:/Windows/Fonts', 'C:/WINNT/Fonts']
+    elif system == 'Darwin':
+        font_dirs = ['/System/Library/Fonts', '/Library/Fonts', os.path.expanduser('~/Library/Fonts')]
+    else:
+        font_dirs = ['/usr/share/fonts', '/usr/local/share/fonts', os.path.expanduser('~/.fonts')]
     
-    # 查找系统中已安装的中文字体
-    available_fonts = []
-    for font in chinese_fonts:
+    # 注册找到的字体
+    registered_fonts = []
+    for font_dir in font_dirs:
+        if os.path.exists(font_dir):
+            try:
+                fm.fontManager.addfont(font_dir)
+            except:
+                pass
+    
+    # 5. 测试每个字体，使用第一个可用的
+    for font in font_priorities:
         try:
-            # 检查字体是否存在
-            font_path = fm.findfont(font, fallback_to_default=False)
-            if font_path:
-                available_fonts.append(font)
-        except:
+            # 设置字体
+            plt.rcParams['font.sans-serif'] = [font] + ['DejaVu Sans']
+            plt.rcParams['axes.unicode_minus'] = False
+            
+            # 测试字体是否可用
+            fig, ax = plt.subplots(figsize=(2, 1))
+            ax.set_title('测试中文')
+            ax.set_xlabel('测试X轴')
+            ax.set_ylabel('测试Y轴')
+            plt.close(fig)
+            
+            print(f"✅ 成功加载中文字体: {font}")
+            return True
+        except Exception as e:
             continue
     
-    if available_fonts:
-        # 使用第一个可用的中文字体
-        font_name = available_fonts[0]
-        plt.rcParams['font.sans-serif'] = [font_name] + ['DejaVu Sans']
-        plt.rcParams['font.family'] = 'sans-serif'
-        print(f"✅ 成功加载中文字体: {font_name}")
-    else:
-        # 如果没有找到中文字体，使用默认字体并给出警告
-        print("⚠️ 未找到中文字体，图表将使用英文显示")
-        plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
-    
+    # 6. 如果都失败，使用DejaVu Sans（纯英文）
+    print("⚠️ 未找到中文字体，图表将使用英文显示")
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
     plt.rcParams['axes.unicode_minus'] = False
-    return available_fonts
+    return False
 
-# 调用字体设置函数
-setup_chinese_font()
+# 执行初始化
+setup_matplotlib_chinese()
 
-# 创建图表的辅助函数，确保中文显示正常
 def create_fig_ax(figsize=(12, 6)):
     """创建图表和轴对象，确保中文显示正常"""
     fig, ax = plt.subplots(figsize=figsize)
-    # 重新应用字体设置
-    setup_chinese_font()
+    
+    # 重新应用seaborn样式
+    sns.set_style("whitegrid")
+    
+    # 重新设置字体
+    setup_matplotlib_chinese()
+    
     return fig, ax
 
-# 设置seaborn样式
-sns.set_style("whitegrid")
+# 强制刷新字体缓存
 try:
-    if setup_chinese_font():
-        sns.set(font=setup_chinese_font()[0] if setup_chinese_font() else 'DejaVu Sans')
+    fm._rebuild()
 except:
     pass
-# ================================================
+# =========================================================
 
 # 设置页面配置
 st.set_page_config(
@@ -386,7 +428,7 @@ if selected_analysis == "基本数据概览":
         st.subheader("💾 数据导出")
         col1, col2 = st.columns(2)
         with col1:
-            csv = filtered_df.to_csv(index=False).encode('utf-8-sig')  # 使用utf-8-sig编码
+            csv = filtered_df.to_csv(index=False).encode('utf-8-sig')
             st.download_button(
                 label="📥 导出CSV",
                 data=csv,
