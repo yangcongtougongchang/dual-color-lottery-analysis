@@ -117,6 +117,11 @@ def load_initial_data():
     """加载初始数据"""
     try:
         df = pd.read_csv("data/initial_data.csv")
+        # 转换数据类型
+        for col in ['红球1', '红球2', '红球3', '红球4', '红球5', '红球6', '蓝球']:
+            df[col] = df[col].astype(int)
+        df['奖池(元)'] = df['奖池(元)'].astype(float)
+        df['开奖日期'] = pd.to_datetime(df['开奖日期'])
         return df
     except Exception as e:
         st.error(f"加载初始数据失败: {e}")
