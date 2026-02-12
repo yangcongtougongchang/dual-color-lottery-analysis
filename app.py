@@ -11,24 +11,35 @@ from datetime import datetime
 import io
 from matplotlib.font_manager import FontProperties
 import matplotlib
-import matplotlib.pyplot as plt
+# 尝试设置中文字体，添加多个备选字体
+try:
+    # 检查可用字体
+    from matplotlib.font_manager import FontManager
+    fm = FontManager()
+    available_fonts = [f.name for f in fm.ttflist]
+    
+    # 备选字体列表
+    chinese_fonts = ['SimHei', 'WenQuanYi Micro Hei', 'Heiti TC', 'Arial Unicode MS', 'sans-serif']
+    
+    # 选择第一个可用的中文字体
+    for font in chinese_fonts:
+        if font in available_fonts:
+            matplotlib.rcParams['font.sans-serif'] = [font]
+            print(f"使用字体: {font}")
+            break
+    else:
+        # 如果没有找到中文字体，使用默认字体并启用文本渲染器
+        matplotlib.rcParams['font.sans-serif'] = ['sans-serif']
+        print("未找到中文字体，使用默认字体")
+        
+except Exception as e:
+    print(f"字体设置错误: {e}")
+    # 回退到基本设置
+    matplotlib.rcParams['font.sans-serif'] = ['sans-serif']
 
+matplotlib.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
 # 确保使用Agg后端，避免显示问题
 matplotlib.use('Agg')
-
-# 简化的字体配置，避免复杂的字体检测
-matplotlib.rcParams['font.family'] = ['sans-serif']
-matplotlib.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'sans-serif']
-matplotlib.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
-
-# 禁用Matplotlib的字体缓存
-matplotlib.rcParams['font.cachedir'] = None
-
-# 简化的图表创建函数
-def create_fig_ax(figsize=(12, 6)):
-    """创建图表和轴对象"""
-    fig, ax = plt.subplots(figsize=figsize)
-    return fig, ax
 
 # 设置页面配置
 st.set_page_config(
@@ -38,7 +49,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 图表创建函数已在上面定义
+# 创建图表的辅助函数，确保中文显示正常
+def create_fig_ax(figsize=(12, 6)):
+    """创建图表和轴对象，确保中文显示正常"""
+    fig, ax = plt.subplots(figsize=figsize)
+    # 再次设置字体，确保图表级别应用
+    plt.rcParams['font.sans-serif'] = matplotlib.rcParams['font.sans-serif']
+    plt.rcParams['axes.unicode_minus'] = False
+    return fig, ax
 
 # 自定义CSS，隐藏GitHub图标但保留header
 hide_github_style = """
