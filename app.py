@@ -12,45 +12,8 @@ import io
 from matplotlib.font_manager import FontProperties
 import matplotlib
 import matplotlib.font_manager as fm
-# Windows
-plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
-# macOS
-# plt.rcParams['font.sans-serif'] = ['PingFang SC', 'Heiti SC']
-# Linux
-# plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei']
+plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
-# 尝试设置中文字体，添加多个备选字体
-
-
-try:
-    # 检查可用字体
-    from matplotlib.font_manager import FontManager
-    fm = FontManager()
-    available_fonts = [f.name for f in fm.ttflist]
-    
-    # 备选字体列表
-    chinese_fonts = ['SimHei', 'WenQuanYi Micro Hei', 'Heiti TC', 'Arial Unicode MS', 'sans-serif']
-    
-    # 选择第一个可用的中文字体
-    for font in chinese_fonts:
-        if font in available_fonts:
-            matplotlib.rcParams['font.sans-serif'] = [font]
-            print(f"使用字体: {font}")
-            break
-    else:
-        # 如果没有找到中文字体，使用默认字体并启用文本渲染器
-        matplotlib.rcParams['font.sans-serif'] = ['sans-serif']
-        print("未找到中文字体，使用默认字体")
-        
-except Exception as e:
-    print(f"字体设置错误: {e}")
-    # 回退到基本设置
-    matplotlib.rcParams['font.sans-serif'] = ['sans-serif']
-
-matplotlib.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
-# 确保使用Agg后端，避免显示问题
-matplotlib.use('Agg')
-
 # 设置页面配置
 st.set_page_config(
     page_title="双色球历史数据规律分析",
